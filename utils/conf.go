@@ -79,7 +79,7 @@ var (
 		"scrColorDepth": "qmyu",
 	}
 
-	QueryUrl = ""
+	QueryUrl = "leftTicket/query"
 	CDNs = []string{}
 	UserAgent = ""
 	WxRobot = ""

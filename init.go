@@ -38,7 +38,6 @@ func initUtil() {
 	utils.SaveConf()
 	utils.InitBlacklist()
 	utils.InitAvailableCDN()
-	time.Sleep(10*time.Second)
 }
 
 

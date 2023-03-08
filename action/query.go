@@ -5,6 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"time"
+
+	"github.com/cihub/seelog"
+
 	"github.com/yincongcyincong/go12306/module"
 	"github.com/yincongcyincong/go12306/utils"
 	"net/url"
@@ -22,17 +28,41 @@ func GetTrainInfo(searchParam *module.SearchParam) ([]*module.TrainData, error) 
 
 	var err error
 	searchRes := new(module.TrainRes)
-	cdn := utils.GetCdn()
-	fmt.Println(cdn)
-	if utils.InBlackList(cdn) {
-		return nil, errors.New(fmt.Sprintf("%s 在小黑屋", cdn))
+	targeturl := fmt.Sprintf("https://kyfw.12306.cn/otn/%s?leftTicketDTO.train_date=%s&leftTicketDTO.from_station=%s&leftTicketDTO.to_station=%s&purpose_codes=ADULT",
+		utils.QueryUrl, searchParam.TrainDate, searchParam.FromStation, searchParam.ToStation)
+	req, err := http.NewRequest("GET", targeturl, strings.NewReader(""))
+	if err != nil {
+		return nil, err
+	}
+	// 固定
+	req.Header.Set("Cookie", "RAIL_DEVICEID=1")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+	req.Header.Set("User-Agent", utils.UserAgent)
+	req.Header.Set("Host", "kyfw.12306.cn")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Origin", "https://kyfw.12306.cn")
+
+	now := time.Now()
+	var resp *http.Response
+	client := http.Client{}
+	resp, err = client.Do(req)
+
+	seelog.Info(time.Since(now))
+	if err != nil || resp == nil {
+		return nil, err
 	}
 
-	err = utils.RequestGetWithCDN(utils.GetCookieStr(), fmt.Sprintf("https://kyfw.12306.cn/otn/%s?leftTicketDTO.train_date=%s&leftTicketDTO.from_station=%s&leftTicketDTO.to_station=%s&purpose_codes=ADULT",
-		utils.QueryUrl, searchParam.TrainDate, searchParam.FromStation, searchParam.ToStation), searchRes, nil, cdn)
+	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		utils.AddBlackList(cdn)
 		return nil, err
+	}
+	defer resp.Body.Close()
+
+	seelog.Tracef("url: %v, response: %v, cdn: %s", targeturl, string(respBody), "")
+
+	err = json.Unmarshal(respBody, searchRes)
+	if err != nil {
+		return nil, fmt.Errorf("%s ：%s", err.Error(), "json Unmarshal resp failed")
 	}
 
 	if searchRes.HTTPStatus != 200 && searchRes.Status {
@@ -129,7 +159,7 @@ func GetPassengers(submitToken *module.SubmitToken) (*module.PassengerRes, error
 			p.PassengerType, p.PassengerName, p.PassengerIdTypeCode, p.PassengerIdNo, p.MobileNo, p.AllEncStr)
 		oldPassengerStr := fmt.Sprintf("%s,%s,%s,%s_",
 			p.PassengerName, p.PassengerIdTypeCode, p.PassengerIdNo, p.PassengerType)
-		passengerInfo := fmt.Sprintf("%s#%s#1#%s#%s;",p.PassengerType, p.PassengerName, p.PassengerIdNo,p.AllEncStr)
+		passengerInfo := fmt.Sprintf("%s#%s#1#%s#%s;", p.PassengerType, p.PassengerName, p.PassengerIdNo, p.AllEncStr)
 		p.PassengerTicketStr = passengerTicketStr
 		p.OldPassengerStr = oldPassengerStr
 		p.PassengerInfo = passengerInfo
@@ -142,7 +172,7 @@ func GetPassengers(submitToken *module.SubmitToken) (*module.PassengerRes, error
 				"1", p.PassengerName, p.PassengerIdTypeCode, p.PassengerIdNo, p.MobileNo, p.AllEncStr)
 			tmpPassenger.OldPassengerStr = fmt.Sprintf("%s,%s,%s,%s_",
 				p.PassengerName, p.PassengerIdTypeCode, p.PassengerIdNo, "1")
-			tmpPassenger.PassengerInfo = fmt.Sprintf("%s#%s#1#%s#%s;","1", p.PassengerName, p.PassengerIdNo,p.AllEncStr)
+			tmpPassenger.PassengerInfo = fmt.Sprintf("%s#%s#1#%s#%s;", "1", p.PassengerName, p.PassengerIdNo, p.AllEncStr)
 
 			// 把不是特殊票的名称改成特殊票
 			switch p.PassengerType {
@@ -175,11 +205,11 @@ func CheckUser() error {
 	}
 
 	if res.Status && res.HTTPStatus != 200 {
-		return errors.New(fmt.Sprintf("检查用户失败:%+v",res))
+		return errors.New(fmt.Sprintf("检查用户失败:%+v", res))
 	}
 
 	if !res.Data.Flag {
-		return errors.New(fmt.Sprintf("检查用户失败:%+v",res))
+		return errors.New(fmt.Sprintf("检查用户失败:%+v", res))
 	}
 	return nil
 
