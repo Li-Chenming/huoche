@@ -187,7 +187,7 @@ func CommandStart() {
 
 				// 暂时用不上
 				if *wxrobot != "" {
-					utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功, 请登陆12306查看，付款", t.TrainNo))
+					utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功,  %s 请登陆12306查看，付款", t.TrainNo,passengerStr))
 				}
 				// goto Reorder
 
