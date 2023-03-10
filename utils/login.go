@@ -37,6 +37,14 @@ func LoginByUserNameAndPass() (err error) {
     defer cancel()
 
 
+    user, err := C.GetValue("login_info", "user")
+    if err!=nil {
+        panic("no user")
+    }
+    pass, err := C.GetValue("login_info", "pass")
+    if err!=nil {
+        panic("no pass")
+    }
     cookiesVal := ""
 
     //cookie
@@ -53,9 +61,9 @@ func LoginByUserNameAndPass() (err error) {
         chromedp.Sleep(time.Second*1),
 
         // 账号
-        chromedp.SetValue(`#J-userName`, "17186788086", chromedp.ByID),
+        chromedp.SetValue(`#J-userName`, user, chromedp.ByID),
         // 密码
-        chromedp.SetValue(`#J-password`, "19950204lcm", chromedp.ByID),
+        chromedp.SetValue(`#J-password`, pass, chromedp.ByID),
         chromedp.Click(`#J-login`, chromedp.ByID),
         // 模拟滑动验证
         chromedp.QueryAfter("#nc_1_n1z", func(fctx context.Context, id runtime.ExecutionContextID, node ...*cdp.Node) error {
@@ -99,8 +107,6 @@ func LoginByUserNameAndPass() (err error) {
 
 //模拟滑动
 func MouseDragNode(n *cdp.Node, cxt context.Context) error {
-    fmt.Println(n)
-    fmt.Println("----")
     boxes, err := dom.GetContentQuads().WithNodeID(n.NodeID).Do(cxt)
     if err!=nil {
         return err

@@ -123,7 +123,7 @@ func CommandStart() {
 	}
 
 	// 修改多线程
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 2; i++ {
 		// 梯度开始刷票时间
 		time.Sleep(time.Duration(i * 100))
 
@@ -132,10 +132,9 @@ func CommandStart() {
 		Search:
 			var t *module.TrainData
 			var isAfterNate bool
-			for i := 0; i < 2000; i++ {
+			for i := 0; i < 2; i++ {
 				seelog.Infof("第%d次循环",i)
 				t, isAfterNate, err = getTrainInfo(ctx, searchParam, trainMap, seatSlice, isNate)
-				return
 				if t !=nil{
 					seelog.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s, \n sss:%s",
 						t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"],t.SecretStr)
