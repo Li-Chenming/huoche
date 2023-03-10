@@ -5,11 +5,9 @@ import (
 	"strings"
 )
 
-const (
-	ConfFile = "./conf/conf.ini"
-)
-
 var (
+	ConfFile string= "./conf/conf.ini"
+
 	Station = map[string]string{}
 
 	OrderSeatType = map[string]string{

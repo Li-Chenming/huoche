@@ -11,15 +11,11 @@ import (
 )
 
 func Init() {
+	utils.ConfFile = *configPath
 	initLog()
 	initUtil()
-	// initHttp()
-
-	if *runType == "command" {
-		go CommandStart()
-	}
+	initHttp()
 }
-
 
 func initUtil() {
 	// 用户自己设置设置device信息
@@ -39,7 +35,6 @@ func initUtil() {
 	utils.InitBlacklist()
 	// utils.InitAvailableCDN()
 }
-
 
 func initLog() {
 	logType := `<console/>`

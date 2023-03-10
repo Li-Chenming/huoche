@@ -122,58 +122,83 @@ func CommandStart() {
 			t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"]))
 	}
 
-	// 修改多线程
-	for i := 0; i < 2; i++ {
-		// 梯度开始刷票时间
-		time.Sleep(time.Duration(i * 100))
-
-		ctx, cancelFunc := context.WithCancel(context.Background())
-		go func(thredID int) {
-		Search:
-			var t *module.TrainData
-			var isAfterNate bool
-			for i := 0; i < 2; i++ {
-				seelog.Infof("第%d次循环",i)
-				t, isAfterNate, err = getTrainInfo(ctx, searchParam, trainMap, seatSlice, isNate)
-				if t !=nil{
-					seelog.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s, \n sss:%s",
-						t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"],t.SecretStr)
-				}
-				if err == success {
-					cancelFunc()
-					return
-				}
-				if err == nil {
-					cancelFunc()
-					break
-					// time.Sleep(time.Duration(utils.GetRand(utils.SearchInterval[0], utils.SearchInterval[1])) * time.Millisecond)
-				} else {
-					time.Sleep(time.Duration(utils.GetRand(utils.SearchInterval[0], utils.SearchInterval[1])) * time.Millisecond)
-				}
-			}
-
-			if isAfterNate {
-				seelog.Info("开始候补", t.TrainNo)
-				err = startAfterNate(searchParam, t, passengerMap)
-			} else {
-				seelog.Info("开始购买", t.TrainNo)
-				err = startOrder(searchParam, t, passengerMap)
-			}
-
-			// 购买成功加入小黑屋
-			if err != nil {
-				utils.AddBlackList(t.TrainNo)
-				goto Search
-			}
-
-			// 暂时用不上
-			// if *wxrobot != "" {
-			// 	utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功, 请登陆12306查看", t.TrainNo))
-			// }
-			// goto Reorder
-
-		}(i)
+	startRunTimeStr, err := ConfigFile.GetValue("cron", "startRunTime")
+	OffsetMs, err := ConfigFile.Int("cron", "OffsetMs")
+	if err != nil {
+		OffsetMs=0
 	}
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return
+	}
+	startRunTime, err := time.ParseInLocation("2006-01-02 15:04:05", startRunTimeStr, loc)
+	if err != nil {
+		startRunTime = time.Now()
+	}
+	offset := time.Duration(OffsetMs)
+	startRunTime = startRunTime.Add(offset * time.Millisecond)
+
+	fmt.Printf("开始时间：%v\n", startRunTime.String())
+	fmt.Printf("倒计时执行时间：%v\n", startRunTime.Sub(time.Now()).String())
+	goStartOffsetMs, err := ConfigFile.Int("cron", "goStartOffsetMs")
+	if err != nil {
+		goStartOffsetMs = 0
+	}
+	time.AfterFunc(startRunTime.Sub(time.Now()), func() {
+		// 修改多线程
+		for i := 0; i < 2; i++ {
+			// 梯度开始刷票时间
+			time.Sleep(time.Duration(i * goStartOffsetMs))
+
+			ctx, cancelFunc := context.WithCancel(context.Background())
+			go func(threadID int) {
+				// Search:
+				var t *module.TrainData
+				var isAfterNate bool
+				for i := 0; i < 2; i++ {
+					seelog.Infof("第%d线程第%d次循环\n",threadID,i)
+					t, isAfterNate, err = getTrainInfo(ctx, searchParam, trainMap, seatSlice, isNate)
+					if t !=nil{
+						seelog.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s, \n sss:%s",
+							t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"],t.SecretStr)
+					}
+					if err == success {
+						cancelFunc()
+						return
+					}
+					if err == nil {
+						cancelFunc()
+						break
+						// time.Sleep(time.Duration(utils.GetRand(utils.SearchInterval[0], utils.SearchInterval[1])) * time.Millisecond)
+					} else {
+						time.Sleep(time.Duration(utils.GetRand(utils.SearchInterval[0], utils.SearchInterval[1])) * time.Millisecond)
+					}
+				}
+
+				if isAfterNate {
+					seelog.Info("开始候补", t.TrainNo)
+					err = startAfterNate(searchParam, t, passengerMap)
+				} else {
+					seelog.Info("开始购买", t.TrainNo)
+					err = startOrder(searchParam, t, passengerMap)
+				}
+
+				// 购买成功加入小黑屋
+				if err != nil {
+					utils.AddBlackList(t.TrainNo)
+					// goto Search
+				}
+
+				// 暂时用不上
+				// if *wxrobot != "" {
+				// 	utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功, 请登陆12306查看", t.TrainNo))
+				// }
+				// goto Reorder
+
+			}(i)
+		}
+	})
+
 
 }
 
