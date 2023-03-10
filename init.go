@@ -13,7 +13,7 @@ import (
 func Init() {
 	initLog()
 	initUtil()
-	initHttp()
+	// initHttp()
 
 	if *runType == "command" {
 		go CommandStart()
@@ -37,7 +37,7 @@ func initUtil() {
 
 	utils.SaveConf()
 	utils.InitBlacklist()
-	utils.InitAvailableCDN()
+	// utils.InitAvailableCDN()
 }
 
 

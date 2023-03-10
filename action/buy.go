@@ -181,13 +181,13 @@ func OrderWait(submitToken *module.SubmitToken) (*module.OrderWaitRes, error) {
 	} else {
 		switch orderWaitRes.Data.WaitTime {
 		case -100:
-			seelog.Info("重新获取订单号")
+			seelog.Info("已经提交队列，重新获取订单号")
 		case -2, -3:
-			seelog.Errorf("订单失败获取消")
+			seelog.Errorf("已经提交队列，订单失败获取消")
 		default:
-			seelog.Infof("等待时间:%d,等待人数：%d", orderWaitRes.Data.WaitTime, orderWaitRes.Data.WaitCount)
+			seelog.Infof("已经提交队列，等待时间:%d,等待人数：%d", orderWaitRes.Data.WaitTime, orderWaitRes.Data.WaitCount)
 		}
-		return nil, errors.New("需要继续等待")
+		return nil, errors.New("已经提交队列，未知错误码, 需要继续等待")
 	}
 }
 

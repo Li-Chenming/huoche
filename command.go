@@ -25,17 +25,36 @@ func CommandStart() {
 	if err := action.GetLoginData(); err != nil {
 		seelog.Errorf("GetLoginDataRes:%v", err)
 
-		qrImage, err := action.CreateImage()
-		if err != nil {
-			seelog.Errorf("创建二维码失败:%v", err)
-			return
+		loginType,err:=utils.C.Int("login_type", "login_type")
+		if err!=nil{
+			loginType=0
 		}
-		qrImage.Image = ""
 
-		err = action.QrLogin(qrImage)
-		if err != nil {
-			seelog.Errorf("登陆失败:%v", err)
-			return
+		if loginType==0{
+			qrImage, err := action.CreateImage()
+			if err != nil {
+				seelog.Errorf("创建二维码失败:%v", err)
+				return
+			}
+			qrImage.Image = ""
+
+			err = action.QrLogin(qrImage)
+			if err != nil {
+				seelog.Errorf("登陆失败:%v", err)
+				return
+			}
+		}else {
+			err:=utils.LoginByUserNameAndPass()
+			if err != nil {
+				seelog.Errorf("模拟登陆失败:%v", err)
+				return
+			}
+			err = action.GetLoginData();
+			if err != nil{
+				seelog.Errorf("模拟登录检测失败:%v", err)
+
+				return
+			}
 		}
 	}
 
@@ -113,9 +132,10 @@ func CommandStart() {
 		Search:
 			var t *module.TrainData
 			var isAfterNate bool
-			for i := 0; i < 2; i++ {
+			for i := 0; i < 2000; i++ {
 				seelog.Infof("第%d次循环",i)
 				t, isAfterNate, err = getTrainInfo(ctx, searchParam, trainMap, seatSlice, isNate)
+				return
 				if t !=nil{
 					seelog.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s, \n sss:%s",
 						t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"],t.SecretStr)
@@ -293,7 +313,9 @@ func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, pa
 			time.Sleep(7 * time.Second)
 			continue
 		}
-		seelog.Info("等待数据：%v", orderWaitRes.Data)
+		if orderWaitRes!=nil{
+			seelog.Info("等待数据：%v", *orderWaitRes)
+		}
 
 		if orderWaitRes.Data.OrderId != "" {
 			break
