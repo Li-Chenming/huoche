@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+var trainCache *module.TrainData
+
 func CommandStart() {
 	defer func() {
 		if err := recover(); err != nil {
@@ -22,15 +24,16 @@ func CommandStart() {
 		}
 	}()
 
-	if err := action.GetLoginData(); err != nil {
+	err := action.GetLoginData()
+	if err != nil {
 		seelog.Errorf("GetLoginDataRes:%v", err)
 
-		loginType,err:=utils.C.Int("login_type", "login_type")
-		if err!=nil{
-			loginType=0
+		loginType, err := utils.C.Int("login_type", "login_type")
+		if err != nil {
+			loginType = 0
 		}
 
-		if loginType==0{
+		if loginType == 0 {
 			qrImage, err := action.CreateImage()
 			if err != nil {
 				seelog.Errorf("创建二维码失败:%v", err)
@@ -43,14 +46,14 @@ func CommandStart() {
 				seelog.Errorf("登陆失败:%v", err)
 				return
 			}
-		}else {
-			err:=utils.LoginByUserNameAndPass()
+		} else {
+			err := utils.LoginByUserNameAndPass()
 			if err != nil {
 				seelog.Errorf("模拟登陆失败:%v", err)
 				return
 			}
-			err = action.GetLoginData();
-			if err != nil{
+			err = action.GetLoginData()
+			if err != nil {
 				seelog.Errorf("模拟登录检测失败:%v", err)
 
 				return
@@ -60,17 +63,11 @@ func CommandStart() {
 
 	startCheckLogin()
 
-	// Reorder:
-	var err error
+	// 获取配置参数
+	ConfigFile := utils.C
 
 	searchParam := new(module.SearchParam)
 	var trainStr, seatStr, passengerStr string
-
-	ConfigFile := utils.C
-	if err != nil {
-		panic(err)
-	}
-
 	passengerStr, err = ConfigFile.GetValue("passenger", "name")
 	if err != nil {
 		panic(err)
@@ -83,49 +80,44 @@ func CommandStart() {
 	if err != nil {
 		panic(err)
 	}
-
 	searchParam.ToStationName, err = ConfigFile.GetValue("passenger", "to")
 	if err != nil {
 		panic(err)
 	}
-
 	searchParam.FromStation = utils.Station[searchParam.FromStationName]
 	searchParam.ToStation = utils.Station[searchParam.ToStationName]
-
 	trainStr, err = ConfigFile.GetValue("passenger", "train")
 	if err != nil {
 		panic(err)
 	}
-
 	seatStr, err = ConfigFile.GetValue("passenger", "seat")
 	if err != nil {
 		panic(err)
 	}
-
 	isNate, err := ConfigFile.GetValue("passenger", "isNate")
 	if err != nil {
 		panic(err)
 	}
-
-	// 开始轮训买票
 	trainMap := utils.GetBoolMap(strings.Split(trainStr, "#"))
 	passengerMap := utils.GetBoolMap(strings.Split(passengerStr, "#"))
 	seatSlice := strings.Split(seatStr, "#")
 
+	// 查询车次测试
 	trains, err := action.GetTrainInfo(searchParam)
 	if err != nil {
 		seelog.Errorf("查询车站失败:%v", err)
+		return
 	}
-
 	for _, t := range trains {
-		fmt.Println(fmt.Sprintf("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s,",
-			t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"]))
+		seelog.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s,",
+			t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"])
 	}
 
+	// 获取定时抢票配置
 	startRunTimeStr, err := ConfigFile.GetValue("cron", "startRunTime")
 	OffsetMs, err := ConfigFile.Int("cron", "OffsetMs")
 	if err != nil {
-		OffsetMs=0
+		OffsetMs = 0
 	}
 	loc, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {
@@ -144,6 +136,8 @@ func CommandStart() {
 	if err != nil {
 		goStartOffsetMs = 0
 	}
+
+	// 开启抢票
 	time.AfterFunc(startRunTime.Sub(time.Now()), func() {
 		// 修改多线程
 		for i := 0; i < 2; i++ {
@@ -156,15 +150,17 @@ func CommandStart() {
 				var t *module.TrainData
 				var isAfterNate bool
 				for i := 0; i < 2; i++ {
-					seelog.Infof("第%d线程第%d次循环\n",threadID,i)
+					seelog.Infof("第%d线程第%d次循环\n", threadID, i)
 					t, isAfterNate, err = getTrainInfo(ctx, searchParam, trainMap, seatSlice, isNate)
-					if t !=nil{
+					seelog.Infof("刷到票时间%v\n",time.Now())
+					if t != nil {
 						seelog.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s, \n sss:%s",
-							t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"],t.SecretStr)
+							t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"], t.SecretStr)
+						trainCache = t
 					}
 					if err == success {
 						cancelFunc()
-						return
+						break
 					}
 					if err == nil {
 						cancelFunc()
@@ -190,15 +186,14 @@ func CommandStart() {
 				}
 
 				// 暂时用不上
-				// if *wxrobot != "" {
-				// 	utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功, 请登陆12306查看", t.TrainNo))
-				// }
+				if *wxrobot != "" {
+					utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功, 请登陆12306查看，付款", t.TrainNo))
+				}
 				// goto Reorder
 
 			}(i)
 		}
 	})
-
 
 }
 
@@ -274,31 +269,33 @@ func getTrainInfo(ctx context.Context, searchParam *module.SearchParam, trainMap
 }
 
 func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, passengerMap map[string]bool) error {
-	err := action.GetLoginData()
-	if err != nil {
-		seelog.Errorf("自动登陆失败：%v", err)
-		return err
-	}
+	// err := action.GetLoginData()
+	// if err != nil {
+	// 	seelog.Errorf("自动登陆失败：%v", err)
+	// 	return err
+	// }
+	//
+	// err = action.CheckUser()
+	// if err != nil {
+	// 	seelog.Errorf("检查用户状态失败：%v", err)
+	// 	return err
+	// }
 
-	err = action.CheckUser()
-	if err != nil {
-		seelog.Errorf("检查用户状态失败：%v", err)
-		return err
-	}
-
-	err = action.SubmitOrder(trainData, searchParam)
+	err := action.SubmitOrder(trainData, searchParam)
 	if err != nil {
 		seelog.Errorf("提交订单失败：%v", err)
 		return err
 	}
 
 	submitToken, err := action.GetRepeatSubmitToken()
+	seelog.Infof("submitToken=%v",submitToken)
 	if err != nil {
 		seelog.Errorf("获取提交数据失败：%v", err)
 		return err
 	}
 
 	passengers, err := action.GetPassengers(submitToken)
+
 	if err != nil {
 		seelog.Errorf("获取乘客失败：%v", err)
 		return err
@@ -310,7 +307,7 @@ func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, pa
 			buyPassengers = append(buyPassengers, p)
 		}
 	}
-	seelog.Errorf("----：%v", "err")
+	seelog.Infof("buyPassengers=%v",buyPassengers)
 
 	err = action.CheckOrder(buyPassengers, submitToken, searchParam)
 	if err != nil {
@@ -329,6 +326,7 @@ func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, pa
 		seelog.Errorf("提交订单失败：%v", err)
 		return err
 	}
+	seelog.Infof("提交订单时间%v\n",time.Now())
 
 	var orderWaitRes *module.OrderWaitRes
 	for i := 0; i < 20; i++ {
@@ -337,7 +335,7 @@ func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, pa
 			time.Sleep(7 * time.Second)
 			continue
 		}
-		if orderWaitRes!=nil{
+		if orderWaitRes != nil {
 			seelog.Info("等待数据：%v", *orderWaitRes)
 		}
 

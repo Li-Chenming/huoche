@@ -87,8 +87,8 @@ func Request(data string, cookieStr, url string, res interface{}, headers map[st
 	}
 
 	seelog.Infof("url\n %v \n", url)
-	seelog.Infof("header \n %v",req.Header)
-	seelog.Infof("cookie\n %v \n", cookie.cookie)
+	// seelog.Infof("header \n %v",req.Header)
+	// seelog.Infof("cookie\n %v \n", cookie.cookie)
 
 	resp, err := GetClient().Do(req)
 	if err != nil {
@@ -132,9 +132,9 @@ func RequestGet(cookieStr, url string, res interface{}, headers map[string]strin
 		req.Header.Set(k, v)
 	}
 	seelog.Infof("url\n %v \n", url)
-	seelog.Infof("header \n %v",req.Header)
-	seelog.Infof("cookie\n %v \n", cookie.cookie)
-
+	// seelog.Infof("header \n %v",req.Header)
+	// seelog.Infof("cookie\n %v \n", cookie.cookie)
+	//
 	resp, err := GetClient().Do(req)
 	if err != nil {
 		return err
@@ -177,8 +177,8 @@ func RequestGetWithoutJson(cookieStr, url string, headers map[string]string) ([]
 	}
 
 	seelog.Infof("url\n %v \n", url)
-	seelog.Infof("header \n %v",req.Header)
-	seelog.Infof("cookie\n %v \n", cookie.cookie)
+	// seelog.Infof("header \n %v",req.Header)
+	// seelog.Infof("cookie\n %v \n", cookie.cookie)
 
 	resp, err := GetClient().Do(req)
 	if err != nil {
@@ -218,8 +218,8 @@ func RequestGetWithCDN(cookieStr, url string, res interface{}, headers map[strin
 	}
 
 	seelog.Infof("url\n %v \n", url)
-	seelog.Infof("header \n %v",req.Header)
-	seelog.Infof("cookie\n %v \n", cookie.cookie)
+	// seelog.Infof("header \n %v",req.Header)
+	// seelog.Infof("cookie\n %v \n", cookie.cookie)
 
 	now := time.Now()
 	var  resp *http.Response
