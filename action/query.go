@@ -119,7 +119,11 @@ func GetRepeatSubmitToken() (*module.SubmitToken, error) {
 
 	ticketRes := TicketInfoRe.FindSubmatch(body)
 	if len(ticketRes) > 1 {
+		seelog.Info(string(ticketRes[1]))
+
 		ticketRes[1] = bytes.Replace(ticketRes[1], []byte("'"), []byte(`"`), -1)
+		seelog.Info(string(ticketRes[1]))
+
 		err = json.Unmarshal(ticketRes[1], &submitToken.TicketInfo)
 		if err != nil {
 			return nil, err
@@ -135,6 +139,9 @@ func GetRepeatSubmitToken() (*module.SubmitToken, error) {
 		}
 	}
 
+	if submitToken.TicketInfo==nil||submitToken.OrderRequestParam==nil{
+		return nil, errors.New("get submitToken.TicketInfo is err")
+	}
 	return submitToken, nil
 }
 

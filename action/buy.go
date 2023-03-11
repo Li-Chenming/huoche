@@ -133,10 +133,36 @@ func ConfirmQueue(passengers []*module.Passenger, submitToken *module.SubmitToke
 	data.Set("passengerTicketStr", passengerTicketStr)
 	data.Set("oldPassengerStr", oldPassengerStr)
 	data.Set("randCode", "")
-	data.Set("purpose_codes", submitToken.TicketInfo["purpose_codes"].(string))
-	data.Set("key_check_isChange", submitToken.TicketInfo["key_check_isChange"].(string))
-	data.Set("leftTicketStr", submitToken.TicketInfo["leftTicketStr"].(string))
-	data.Set("train_location", submitToken.TicketInfo["train_location"].(string))
+	purpose_codes,ok:= submitToken.TicketInfo["purpose_codes"].(string)
+	if !ok{
+		seelog.Errorf("purpose_codes failed")
+
+		purpose_codes="00"
+	}
+	data.Set("purpose_codes", purpose_codes)
+
+	key_check_isChange,ok:= submitToken.TicketInfo["key_check_isChange"].(string)
+	if !ok{
+		seelog.Errorf("key_check_isChange failed")
+		key_check_isChange=""
+	}
+
+	data.Set("key_check_isChange", key_check_isChange)
+	leftTicketStr,ok:= submitToken.TicketInfo["leftTicketStr"].(string)
+	if !ok{
+		seelog.Errorf("leftTicketStr failed")
+		leftTicketStr=""
+	}
+
+	train_location,ok:= submitToken.TicketInfo["train_location"].(string)
+	if !ok{
+		seelog.Errorf("train_location failed")
+		train_location="W2"
+	}
+
+
+	data.Set("leftTicketStr", leftTicketStr)
+	data.Set("train_location", train_location)
 	data.Set("choose_seats", "")
 	data.Set("seatDetailType", "000")
 	data.Set("is_jy", "N")

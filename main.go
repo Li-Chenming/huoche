@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"github.com/cihub/seelog"
@@ -170,15 +171,41 @@ func CommandStart() {
 		goStartOffsetMs = 0
 	}
 
+	var goNum int =1
+	goNum, _ = ConfigFile.Int("cron", "goNum")
+
 	// 开启抢票
 	time.AfterFunc(startRunTime.Sub(time.Now()), func() {
 		// 修改多线程
-		for i := 0; i < 2; i++ {
+		for i := 0; i < goNum; i++ {
 			// 梯度开始刷票时间
 			time.Sleep(time.Duration(i * goStartOffsetMs))
 
 			ctx, cancelFunc := context.WithCancel(context.Background())
 			go func(threadID int) {
+				defer func() {
+					if err := recover(); err != nil {
+						seelog.Error(err)
+						seelog.Flush()
+						if trainCache==nil{
+							return
+						}
+						seelog.Info("开始购买兜底", trainCache.TrainNo)
+						err2:=startOrder(searchParam, trainCache, passengerMap)
+						// 购买成功加入小黑屋
+						if err2 != nil {
+							utils.AddBlackList(trainCache.TrainNo)
+							// goto Search
+						}
+
+						// 暂时用不上
+						if *wxrobot != "" {
+							utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功,  %s 请登陆12306查看，付款", trainCache.TrainNo,passengerStr))
+						}
+						// goto Reorder
+					}
+				}()
+
 				// Search:
 				var t *module.TrainData
 				var isAfterNate bool
@@ -202,6 +229,10 @@ func CommandStart() {
 					} else {
 						time.Sleep(time.Duration(utils.GetRand(utils.SearchInterval[0], utils.SearchInterval[1])) * time.Millisecond)
 					}
+				}
+
+				if t==nil{
+					return
 				}
 
 				if isAfterNate {
@@ -301,6 +332,7 @@ func getTrainInfo(ctx context.Context, searchParam *module.SearchParam, trainMap
 	return trainData, false, nil
 }
 
+var sumbitCount int =2
 func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, passengerMap map[string]bool) error {
 	// err := action.GetLoginData()
 	// if err != nil {
@@ -313,24 +345,40 @@ func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, pa
 	// 	seelog.Errorf("检查用户状态失败：%v", err)
 	// 	return err
 	// }
+	var c int
 
+SubmitOrder:
 	err := action.SubmitOrder(trainData, searchParam)
 	if err != nil {
 		seelog.Errorf("提交订单失败：%v", err)
+		if c<sumbitCount{
+			c++
+			goto SubmitOrder
+		}
 		return err
 	}
-
+	GetRepeatSubmitToken:
 	submitToken, err := action.GetRepeatSubmitToken()
-	seelog.Infof("submitToken=%v",submitToken)
+	marshal, _ := json.Marshal(submitToken.TicketInfo)
+	seelog.Infof("submitToken=\n %s",string(marshal))
 	if err != nil {
+		if c<sumbitCount{
+			c++
+			goto GetRepeatSubmitToken
+		}
 		seelog.Errorf("获取提交数据失败：%v", err)
 		return err
 	}
 
+	GetPassengers:
 	passengers, err := action.GetPassengers(submitToken)
 
 	if err != nil {
 		seelog.Errorf("获取乘客失败：%v", err)
+		if c<sumbitCount{
+			c++
+			goto GetPassengers
+		}
 		return err
 	}
 	// go
@@ -342,9 +390,14 @@ func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, pa
 	}
 	seelog.Infof("buyPassengers=%v",buyPassengers)
 
+	CheckOrder:
 	err = action.CheckOrder(buyPassengers, submitToken, searchParam)
 	if err != nil {
 		seelog.Errorf("检查订单失败：%v", err)
+		if c<sumbitCount{
+			c++
+			goto CheckOrder
+		}
 		return err
 	}
 
@@ -353,10 +406,14 @@ func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, pa
 	// 	seelog.Errorf("获取排队数失败：%v", err)
 	// 	return err
 	// }
-
+	ConfirmQueue:
 	err = action.ConfirmQueue(buyPassengers, submitToken, searchParam)
 	if err != nil {
 		seelog.Errorf("提交订单失败：%v", err)
+		if c<sumbitCount{
+			c++
+			goto ConfirmQueue
+		}
 		return err
 	}
 	seelog.Infof("提交订单时间%v\n",time.Now())
