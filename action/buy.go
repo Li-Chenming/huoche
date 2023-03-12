@@ -3,7 +3,6 @@ package action
 import (
 	"errors"
 	"fmt"
-	"github.com/cihub/seelog"
 	"github.com/yincongcyincong/go12306/module"
 	"github.com/yincongcyincong/go12306/utils"
 	"math"
@@ -135,7 +134,7 @@ func ConfirmQueue(passengers []*module.Passenger, submitToken *module.SubmitToke
 	data.Set("randCode", "")
 	purpose_codes,ok:= submitToken.TicketInfo["purpose_codes"].(string)
 	if !ok{
-		seelog.Errorf("purpose_codes failed")
+		utils.SugarLogger.Errorf("purpose_codes failed")
 
 		purpose_codes="00"
 	}
@@ -143,20 +142,20 @@ func ConfirmQueue(passengers []*module.Passenger, submitToken *module.SubmitToke
 
 	key_check_isChange,ok:= submitToken.TicketInfo["key_check_isChange"].(string)
 	if !ok{
-		seelog.Errorf("key_check_isChange failed")
+		utils.SugarLogger.Errorf("key_check_isChange failed")
 		key_check_isChange=""
 	}
 
 	data.Set("key_check_isChange", key_check_isChange)
 	leftTicketStr,ok:= submitToken.TicketInfo["leftTicketStr"].(string)
 	if !ok{
-		seelog.Errorf("leftTicketStr failed")
+		utils.SugarLogger.Errorf("leftTicketStr failed")
 		leftTicketStr=""
 	}
 
 	train_location,ok:= submitToken.TicketInfo["train_location"].(string)
 	if !ok{
-		seelog.Errorf("train_location failed")
+		utils.SugarLogger.Errorf("train_location failed")
 		train_location="W2"
 	}
 
@@ -207,11 +206,11 @@ func OrderWait(submitToken *module.SubmitToken) (*module.OrderWaitRes, error) {
 	} else {
 		switch orderWaitRes.Data.WaitTime {
 		case -100:
-			seelog.Info("已经提交队列，重新获取订单号")
+			utils.SugarLogger.Info("已经提交队列，重新获取订单号")
 		case -2, -3:
-			seelog.Errorf("已经提交队列，订单失败获取消")
+			utils.SugarLogger.Errorf("已经提交队列，订单失败获取消")
 		default:
-			seelog.Infof("已经提交队列，等待时间:%d,等待人数：%d", orderWaitRes.Data.WaitTime, orderWaitRes.Data.WaitCount)
+			utils.SugarLogger.Infof("已经提交队列，等待时间:%d,等待人数：%d", orderWaitRes.Data.WaitTime, orderWaitRes.Data.WaitCount)
 		}
 		return nil, errors.New("已经提交队列，未知错误码, 需要继续等待")
 	}

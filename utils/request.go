@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cihub/seelog"
-	"github.com/yincongcyincong/go12306/module"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yincongcyincong/go12306/module"
 )
 
 var (
@@ -40,6 +40,43 @@ func GetClient() *http.Client {
 
 	return client
 
+}
+
+func GetClientDo(req *http.Request) ([]byte,error) {
+
+	if client == nil {
+		client = &http.Client{
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   5 * time.Second,
+					KeepAlive: 1 * time.Minute,
+				}).DialContext,
+				TLSHandshakeTimeout:   5 * time.Second,
+				ResponseHeaderTimeout: 5 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+				MaxIdleConnsPerHost:   50,
+				IdleConnTimeout:       10 * time.Second,
+			},
+
+		}
+	}
+
+	now:=time.Now()
+	SugarLogger.Debugf("send req url:%s,header:%v", req.URL,req.Header)
+	resp, err := client.Do(req)
+
+	if err != nil || resp == nil {
+		SugarLogger.Errorf("url: %v, err: %v, resp: %s", req.RequestURI, err, resp)
+		return nil, err
+	}
+	defer resp.Body.Close()
+	setCookies := resp.Header.Values("Set-Cookie")
+	AddCookieStr(setCookies)
+
+	res, err := ioutil.ReadAll(resp.Body)
+	SugarLogger.Debugf("url: %v, resp: %s ,timeout :%s", req.RequestURI,string(res),time.Since(now))
+
+	return res, err
 }
 
 func GetCdnClient(cdn string) *http.Client {
@@ -86,32 +123,13 @@ func Request(data string, cookieStr, url string, res interface{}, headers map[st
 		req.Header.Set(k, v)
 	}
 
-	seelog.Infof("url\n %v \n", url)
-	// seelog.Infof("header \n %v",req.Header)
-	// seelog.Infof("cookie\n %v \n", cookie.cookie)
-
-	resp, err := GetClient().Do(req)
-	if err != nil {
-		return err
-	}
-
-	respBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+	respBody, err := GetClientDo(req)
 
 	err = json.Unmarshal(respBody, res)
 	if err != nil {
-		seelog.Errorf("json unmarshal fail: %v, %v, %v", err, string(respBody), url)
+		SugarLogger.Errorf("json unmarshal fail: %v, %v, %v", err, string(respBody), url)
 		return err
 	}
-
-	// 添加cookie
-	setCookies := resp.Header.Values("Set-Cookie")
-	AddCookieStr(setCookies)
-
-	seelog.Tracef("url: %v, param: %v, response: %v", url, data, string(respBody))
 
 	return nil
 }
@@ -131,31 +149,13 @@ func RequestGet(cookieStr, url string, res interface{}, headers map[string]strin
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	seelog.Infof("url\n %v \n", url)
-	// seelog.Infof("header \n %v",req.Header)
-	// seelog.Infof("cookie\n %v \n", cookie.cookie)
-	//
-	resp, err := GetClient().Do(req)
-	if err != nil {
-		return err
-	}
 
-	respBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+	respBody, err := GetClientDo(req)
 
 	err = json.Unmarshal(respBody, res)
 	if err != nil {
 		return err
 	}
-
-	// 添加cookie
-	setCookies := resp.Header.Values("Set-Cookie")
-	AddCookieStr(setCookies)
-
-	seelog.Tracef("url: %v, response: %v", url, string(respBody))
 
 	return nil
 }
@@ -176,26 +176,10 @@ func RequestGetWithoutJson(cookieStr, url string, headers map[string]string) ([]
 		req.Header.Set(k, v)
 	}
 
-	seelog.Infof("url\n %v \n", url)
-	// seelog.Infof("header \n %v",req.Header)
-	// seelog.Infof("cookie\n %v \n", cookie.cookie)
-
-	resp, err := GetClient().Do(req)
+	respBody, err := GetClientDo(req)
 	if err != nil {
 		return []byte{}, err
 	}
-
-	respBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return []byte{}, err
-	}
-	defer resp.Body.Close()
-
-	// 添加cookie
-	setCookies := resp.Header.Values("Set-Cookie")
-	AddCookieStr(setCookies)
-
-	seelog.Tracef("url: %v, response: %v", url, string(respBody))
 
 	return respBody, nil
 }
@@ -217,9 +201,9 @@ func RequestGetWithCDN(cookieStr, url string, res interface{}, headers map[strin
 		req.Header.Set(k, v)
 	}
 
-	seelog.Infof("url\n %v \n", url)
-	// seelog.Infof("header \n %v",req.Header)
-	// seelog.Infof("cookie\n %v \n", cookie.cookie)
+	SugarLogger.Infof("url\n %v \n", url)
+	// SugarLogger.Infof("header \n %v",req.Header)
+	// SugarLogger.Infof("cookie\n %v \n", cookie.cookie)
 
 	now := time.Now()
 	var  resp *http.Response
@@ -230,7 +214,7 @@ func RequestGetWithCDN(cookieStr, url string, res interface{}, headers map[strin
 		resp, err = GetCdnClient(cdn).Do(req)
 	}
 
-	seelog.Infof("URL= %v timecoset %v \n",url,time.Since(now))
+	SugarLogger.Infof("URL= %v timecoset %v \n",url,time.Since(now))
 	if err != nil ||resp==nil {
 		return fmt.Errorf("%s ：%s",err.Error(),"resp is nuil")
 	}
@@ -241,7 +225,7 @@ func RequestGetWithCDN(cookieStr, url string, res interface{}, headers map[strin
 	}
 	defer resp.Body.Close()
 
-	seelog.Tracef("url: %v, response: %v, cdn: %s", url, string(respBody), cdn)
+	SugarLogger.Debugf("url: %v, response: %v, cdn: %s", url, string(respBody), cdn)
 
 	if res != nil {
 		err = json.Unmarshal(respBody, res)

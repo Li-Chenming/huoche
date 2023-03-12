@@ -16,7 +16,6 @@ import (
     "github.com/chromedp/cdproto/page"
     "github.com/chromedp/cdproto/runtime"
     "github.com/chromedp/chromedp"
-    "github.com/cihub/seelog"
 )
 
 func LoginByUserNameAndPass() (err error) {
@@ -100,7 +99,7 @@ func LoginByUserNameAndPass() (err error) {
 
     AddCookieStr([]string{cookiesVal})
 
-    seelog.Infof("cookie\n %v \n", cookie.cookie)
+    SugarLogger.Infof("cookie\n %v \n", cookie.cookie)
     return err
 }
 

@@ -5,17 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"time"
-
-	"github.com/cihub/seelog"
-
-	"github.com/yincongcyincong/go12306/module"
-	"github.com/yincongcyincong/go12306/utils"
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/yincongcyincong/go12306/module"
+	"github.com/yincongcyincong/go12306/utils"
 )
 
 var (
@@ -42,23 +38,10 @@ func GetTrainInfo(searchParam *module.SearchParam) ([]*module.TrainData, error) 
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("Origin", "https://kyfw.12306.cn")
 
-	now := time.Now()
-	var resp *http.Response
-	client := http.Client{}
-	resp, err = client.Do(req)
-
-	seelog.Info(time.Since(now))
-	if err != nil || resp == nil {
-		return nil, err
-	}
-
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := utils.GetClientDo(req)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	seelog.Tracef("url: %v, response: %v, cdn: %s", targeturl, string(respBody), "")
 
 	err = json.Unmarshal(respBody, searchRes)
 	if err != nil {
@@ -119,10 +102,10 @@ func GetRepeatSubmitToken() (*module.SubmitToken, error) {
 
 	ticketRes := TicketInfoRe.FindSubmatch(body)
 	if len(ticketRes) > 1 {
-		seelog.Info(string(ticketRes[1]))
+		utils.SugarLogger.Info(string(ticketRes[1]))
 
 		ticketRes[1] = bytes.Replace(ticketRes[1], []byte("'"), []byte(`"`), -1)
-		seelog.Info(string(ticketRes[1]))
+		utils.SugarLogger.Info(string(ticketRes[1]))
 
 		err = json.Unmarshal(ticketRes[1], &submitToken.TicketInfo)
 		if err != nil {

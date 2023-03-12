@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/cihub/seelog"
 	"github.com/yincongcyincong/go12306/module"
 	"github.com/yincongcyincong/go12306/utils"
 	"io/fs"
@@ -62,7 +61,7 @@ func QrLogin(qrImage *module.QrImage) error {
 		if err == nil && qrRes.ResultCode == "2" {
 			break
 		} else {
-			seelog.Infof("请在'./conf/'查看二维码并用12306扫描登陆，二维码暂未登陆，继续查看二维码状态")
+			utils.SugarLogger.Infof("请在'./conf/'查看二维码并用12306扫描登陆，二维码暂未登陆，继续查看二维码状态")
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -103,7 +102,7 @@ func GetLoginData() error {
 		return err
 	}
 	if userRes.ResultCode != 0 {
-		seelog.Error(userRes.ResultMessage)
+		utils.SugarLogger.Error(userRes.ResultMessage)
 		return errors.New(userRes.ResultMessage)
 	}
 
@@ -116,7 +115,7 @@ func GetLoginData() error {
 	if !apiRes.Status || apiRes.HTTPStatus != 200 {
 		return errors.New(fmt.Sprintf("初始化12306 api失败: %+v", apiRes))
 	}
-	seelog.Infof("%s 登陆成功", apiRes.Data["user_name"])
+	utils.SugarLogger.Infof("%s 登陆成功", apiRes.Data["user_name"])
 
 	// 获取特殊cookie字段
 	staticTk := new(module.TkRes)
@@ -157,7 +156,7 @@ func LoginOut() error {
 
 	_, err = utils.GetClient().Do(req)
 	if err != nil {
-		seelog.Error(err)
+		utils.SugarLogger.Error(err)
 	}
 	return err
 }
@@ -165,7 +164,7 @@ func LoginOut() error {
 func createQrCode(captchBody []byte) error {
 	_, err := os.Stat("./conf")
 	if err != nil {
-		seelog.Warn(err)
+		utils.SugarLogger.Warn(err)
 		err = os.Mkdir("./conf", os.ModePerm)
 		if err != nil {
 			return err

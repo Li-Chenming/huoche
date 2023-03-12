@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"github.com/cihub/seelog"
 	"sync"
 	"time"
 )
@@ -20,8 +19,8 @@ func InitBlacklist() {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				seelog.Error(err)
-				seelog.Flush()
+				SugarLogger.Error(err)
+				SugarLogger.Sync()
 			}
 		}()
 		ticker := time.NewTicker(1 * time.Second)

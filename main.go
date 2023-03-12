@@ -5,14 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"github.com/cihub/seelog"
-	"github.com/yincongcyincong/go12306/action"
-	_ "github.com/yincongcyincong/go12306/action"
-	http12306 "github.com/yincongcyincong/go12306/http"
-	"github.com/yincongcyincong/go12306/module"
-	"github.com/yincongcyincong/go12306/utils"
 	"fmt"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -21,6 +14,12 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/yincongcyincong/go12306/action"
+	_ "github.com/yincongcyincong/go12306/action"
+	http12306 "github.com/yincongcyincong/go12306/http"
+	"github.com/yincongcyincong/go12306/module"
+	"github.com/yincongcyincong/go12306/utils"
 )
 
 var (
@@ -28,10 +27,12 @@ var (
 	wxrobot   = flag.String("wxrobot", "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=c55090ed-f991-46c8-94b7-616cf826ffc9", "企业微信机器人通知")
 	mustDevice = flag.String("must_device", "0", "强制生成设备信息")
 	configPath =flag.String("c", "./conf/conf.ini", "配置文件路径")
+
 )
 
 
 func main() {
+
 	flag.Parse()
 	Init()
 	if *runType == "command" {
@@ -41,7 +42,7 @@ func main() {
 	signal.Notify(sigs, syscall.SIGINT)
 	select {
 	case <-sigs:
-		seelog.Info("用户登出")
+		utils.SugarLogger.Info("用户登出")
 		utils.SaveConf()
 		// action.LoginOut()
 	}
@@ -53,14 +54,14 @@ var trainCache *module.TrainData
 func CommandStart() {
 	defer func() {
 		if err := recover(); err != nil {
-			seelog.Error(err)
-			seelog.Flush()
+			utils.SugarLogger.Error(err)
+			utils.SugarLogger.Sync()
 		}
 	}()
 
 	err := action.GetLoginData()
 	if err != nil {
-		seelog.Errorf("GetLoginDataRes:%v", err)
+		utils.SugarLogger.Errorf("GetLoginDataRes:%v", err)
 
 		loginType, err := utils.C.Int("login_type", "login_type")
 		if err != nil {
@@ -70,25 +71,25 @@ func CommandStart() {
 		if loginType == 0 {
 			qrImage, err := action.CreateImage()
 			if err != nil {
-				seelog.Errorf("创建二维码失败:%v", err)
+				utils.SugarLogger.Errorf("创建二维码失败:%v", err)
 				return
 			}
 			qrImage.Image = ""
 
 			err = action.QrLogin(qrImage)
 			if err != nil {
-				seelog.Errorf("登陆失败:%v", err)
+				utils.SugarLogger.Errorf("登陆失败:%v", err)
 				return
 			}
 		} else {
 			err := utils.LoginByUserNameAndPass()
 			if err != nil {
-				seelog.Errorf("模拟登陆失败:%v", err)
+				utils.SugarLogger.Errorf("模拟登陆失败:%v", err)
 				return
 			}
 			err = action.GetLoginData()
 			if err != nil {
-				seelog.Errorf("模拟登录检测失败:%v", err)
+				utils.SugarLogger.Errorf("模拟登录检测失败:%v", err)
 
 				return
 			}
@@ -136,20 +137,23 @@ func CommandStart() {
 	passengerMap := utils.GetBoolMap(strings.Split(passengerStr, "#"))
 	seatSlice := strings.Split(seatStr, "#")
 
+	now := time.Now()
 	// 查询车次测试
 	trains, err := action.GetTrainInfo(searchParam)
 	if err != nil {
-		seelog.Errorf("查询车站失败:%v", err)
+		utils.SugarLogger.Errorf("查询车站失败:%v", err)
 		return
 	}
+	delay:=time.Since(now).Milliseconds()
 	for _, t := range trains {
-		seelog.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s,",
+		utils.SugarLogger.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s,",
 			t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"])
 	}
 
 	// 获取定时抢票配置
 	startRunTimeStr, err := ConfigFile.GetValue("cron", "startRunTime")
 	OffsetMs, err := ConfigFile.Int("cron", "OffsetMs")
+	OffsetMs-=int(delay)
 	if err != nil {
 		OffsetMs = 0
 	}
@@ -185,12 +189,12 @@ func CommandStart() {
 			go func(threadID int) {
 				defer func() {
 					if err := recover(); err != nil {
-						seelog.Error(err)
-						seelog.Flush()
+						utils.SugarLogger.Error(err)
+						utils.SugarLogger.Sync()
 						if trainCache==nil{
 							return
 						}
-						seelog.Info("开始购买兜底", trainCache.TrainNo)
+						utils.SugarLogger.Info("开始购买兜底", trainCache.TrainNo)
 						err2:=startOrder(searchParam, trainCache, passengerMap)
 						// 购买成功加入小黑屋
 						if err2 != nil {
@@ -210,11 +214,11 @@ func CommandStart() {
 				var t *module.TrainData
 				var isAfterNate bool
 				for i := 0; i < 2; i++ {
-					seelog.Infof("第%d线程第%d次循环\n", threadID, i)
+					utils.SugarLogger.Infof("第%d线程第%d次循环\n", threadID, i)
 					t, isAfterNate, err = getTrainInfo(ctx, searchParam, trainMap, seatSlice, isNate)
-					seelog.Infof("刷到票时间%v\n",time.Now())
+					utils.SugarLogger.Infof("刷到票时间%v\n",time.Now())
 					if t != nil {
-						seelog.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s, \n sss:%s",
+						utils.SugarLogger.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s, \n sss:%s",
 							t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"], t.SecretStr)
 						trainCache = t
 					}
@@ -236,10 +240,10 @@ func CommandStart() {
 				}
 
 				if isAfterNate {
-					seelog.Info("开始候补", t.TrainNo)
+					utils.SugarLogger.Info("开始候补", t.TrainNo)
 					err = startAfterNate(searchParam, t, passengerMap)
 				} else {
-					seelog.Info("开始购买", t.TrainNo)
+					utils.SugarLogger.Info("开始购买", t.TrainNo)
 					err = startOrder(searchParam, t, passengerMap)
 				}
 
@@ -279,14 +283,14 @@ func getTrainInfo(ctx context.Context, searchParam *module.SearchParam, trainMap
 	}
 	trains, err := action.GetTrainInfo(searchParam)
 	if err != nil {
-		seelog.Errorf("查询车站失败:%v", err)
+		utils.SugarLogger.Errorf("查询车站失败:%v", err)
 		return nil, false, err
 	}
 
 	for _, t := range trains {
 		// 在选中的，但是不在小黑屋里面
 		if utils.InBlackList(t.TrainNo) {
-			seelog.Info(t.TrainNo, "在小黑屋，需等待60s")
+			utils.SugarLogger.Info(t.TrainNo, "在小黑屋，需等待60s")
 			continue
 		}
 
@@ -295,10 +299,10 @@ func getTrainInfo(ctx context.Context, searchParam *module.SearchParam, trainMap
 				if t.SeatInfo[s] != "" && t.SeatInfo[s] != "无" {
 					trainData = t
 					searchParam.SeatType = utils.OrderSeatType[s]
-					seelog.Infof("%s %s 数量: %s", t.TrainNo, s, t.SeatInfo[s])
+					utils.SugarLogger.Infof("%s %s 数量: %s", t.TrainNo, s, t.SeatInfo[s])
 					return trainData, false, nil
 				}
-				seelog.Infof("%s %s 数量: %s", t.TrainNo, s, t.SeatInfo[s])
+				utils.SugarLogger.Infof("%s %s 数量: %s", t.TrainNo, s, t.SeatInfo[s])
 			}
 		}
 	}
@@ -308,7 +312,7 @@ func getTrainInfo(ctx context.Context, searchParam *module.SearchParam, trainMap
 		for _, t := range trains {
 			// 在选中的，但是不在小黑屋里面
 			if utils.InBlackList(t.TrainNo) {
-				seelog.Info(t.TrainNo, "在小黑屋，需等待60s")
+				utils.SugarLogger.Info(t.TrainNo, "在小黑屋，需等待60s")
 				continue
 			}
 
@@ -325,7 +329,7 @@ func getTrainInfo(ctx context.Context, searchParam *module.SearchParam, trainMap
 	}
 
 	if trainData == nil || searchParam.SeatType == "" {
-		seelog.Info("暂无车票可以购买")
+		utils.SugarLogger.Info("暂无车票可以购买")
 		return nil, false, errors.New("暂无车票可以购买")
 	}
 
@@ -336,13 +340,13 @@ var sumbitCount int =2
 func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, passengerMap map[string]bool) error {
 	// err := action.GetLoginData()
 	// if err != nil {
-	// 	seelog.Errorf("自动登陆失败：%v", err)
+	// 	utils.SugarLogger.Errorf("自动登陆失败：%v", err)
 	// 	return err
 	// }
 	//
 	// err = action.CheckUser()
 	// if err != nil {
-	// 	seelog.Errorf("检查用户状态失败：%v", err)
+	// 	utils.SugarLogger.Errorf("检查用户状态失败：%v", err)
 	// 	return err
 	// }
 	var c int
@@ -350,7 +354,7 @@ func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, pa
 SubmitOrder:
 	err := action.SubmitOrder(trainData, searchParam)
 	if err != nil {
-		seelog.Errorf("提交订单失败：%v", err)
+		utils.SugarLogger.Errorf("提交订单失败：%v", err)
 		if c<sumbitCount{
 			c++
 			goto SubmitOrder
@@ -360,13 +364,13 @@ SubmitOrder:
 	GetRepeatSubmitToken:
 	submitToken, err := action.GetRepeatSubmitToken()
 	marshal, _ := json.Marshal(submitToken.TicketInfo)
-	seelog.Infof("submitToken=\n %s",string(marshal))
+	utils.SugarLogger.Infof("submitToken=\n %s",string(marshal))
 	if err != nil {
 		if c<sumbitCount{
 			c++
 			goto GetRepeatSubmitToken
 		}
-		seelog.Errorf("获取提交数据失败：%v", err)
+		utils.SugarLogger.Errorf("获取提交数据失败：%v", err)
 		return err
 	}
 
@@ -374,7 +378,7 @@ SubmitOrder:
 	passengers, err := action.GetPassengers(submitToken)
 
 	if err != nil {
-		seelog.Errorf("获取乘客失败：%v", err)
+		utils.SugarLogger.Errorf("获取乘客失败：%v", err)
 		if c<sumbitCount{
 			c++
 			goto GetPassengers
@@ -388,12 +392,12 @@ SubmitOrder:
 			buyPassengers = append(buyPassengers, p)
 		}
 	}
-	seelog.Infof("buyPassengers=%v",buyPassengers)
+	utils.SugarLogger.Infof("buyPassengers=%v",buyPassengers)
 
 	CheckOrder:
 	err = action.CheckOrder(buyPassengers, submitToken, searchParam)
 	if err != nil {
-		seelog.Errorf("检查订单失败：%v", err)
+		utils.SugarLogger.Errorf("检查订单失败：%v", err)
 		if c<sumbitCount{
 			c++
 			goto CheckOrder
@@ -403,20 +407,20 @@ SubmitOrder:
 
 	// err = action.GetQueueCount(submitToken, searchParam)
 	// if err != nil {
-	// 	seelog.Errorf("获取排队数失败：%v", err)
+	// 	utils.SugarLogger.Errorf("获取排队数失败：%v", err)
 	// 	return err
 	// }
 	ConfirmQueue:
 	err = action.ConfirmQueue(buyPassengers, submitToken, searchParam)
 	if err != nil {
-		seelog.Errorf("提交订单失败：%v", err)
+		utils.SugarLogger.Errorf("提交订单失败：%v", err)
 		if c<sumbitCount{
 			c++
 			goto ConfirmQueue
 		}
 		return err
 	}
-	seelog.Infof("提交订单时间%v\n",time.Now())
+	utils.SugarLogger.Infof("提交订单时间%v\n",time.Now())
 
 	var orderWaitRes *module.OrderWaitRes
 	for i := 0; i < 20; i++ {
@@ -426,7 +430,7 @@ SubmitOrder:
 			continue
 		}
 		if orderWaitRes != nil {
-			seelog.Info("等待数据：%v", *orderWaitRes)
+			utils.SugarLogger.Info("等待数据：%v", *orderWaitRes)
 		}
 
 		if orderWaitRes.Data.OrderId != "" {
@@ -437,47 +441,47 @@ SubmitOrder:
 	if orderWaitRes != nil {
 		err = action.OrderResult(submitToken, orderWaitRes.Data.OrderId)
 		if err != nil {
-			seelog.Errorf("获取订单状态失败：%v", err)
+			utils.SugarLogger.Errorf("获取订单状态失败：%v", err)
 		}
 	}
 
 	if orderWaitRes == nil || orderWaitRes.Data.OrderId == "" {
-		seelog.Infof("购买成功")
+		utils.SugarLogger.Infof("购买成功")
 		return nil
 	}
 
-	seelog.Infof("购买成功，订单号：%s", orderWaitRes.Data.OrderId)
+	utils.SugarLogger.Infof("购买成功，订单号：%s", orderWaitRes.Data.OrderId)
 	return nil
 }
 
 func startAfterNate(searchParam *module.SearchParam, trainData *module.TrainData, passengerMap map[string]bool) error {
 	err := action.GetLoginData()
 	if err != nil {
-		seelog.Errorf("自动登陆失败：%v", err)
+		utils.SugarLogger.Errorf("自动登陆失败：%v", err)
 		return err
 	}
 
 	err = action.AfterNateChechFace(trainData, searchParam)
 	if err != nil {
-		seelog.Errorf("人脸验证失败：%v", err)
+		utils.SugarLogger.Errorf("人脸验证失败：%v", err)
 		return err
 	}
 
 	_, err = action.AfterNateSuccRate(trainData, searchParam)
 	if err != nil {
-		seelog.Errorf("获取候补成功率失败：%v", err)
+		utils.SugarLogger.Errorf("获取候补成功率失败：%v", err)
 		return err
 	}
 
 	err = action.CheckUser()
 	if err != nil {
-		seelog.Errorf("检查用户状态失败：%v", err)
+		utils.SugarLogger.Errorf("检查用户状态失败：%v", err)
 		return err
 	}
 
 	err = action.AfterNateSubmitOrder(trainData, searchParam)
 	if err != nil {
-		seelog.Errorf("提交候补订单失败：%v", err)
+		utils.SugarLogger.Errorf("提交候补订单失败：%v", err)
 		return err
 	}
 
@@ -486,7 +490,7 @@ func startAfterNate(searchParam *module.SearchParam, trainData *module.TrainData
 	}
 	passengers, err := action.GetPassengers(submitToken)
 	if err != nil {
-		seelog.Errorf("获取乘客失败：%v", err)
+		utils.SugarLogger.Errorf("获取乘客失败：%v", err)
 		return err
 	}
 	buyPassengers := make([]*module.Passenger, 0)
@@ -498,29 +502,29 @@ func startAfterNate(searchParam *module.SearchParam, trainData *module.TrainData
 
 	err = action.PassengerInit()
 	if err != nil {
-		seelog.Errorf("初始化乘客信息失败：%v", err)
+		utils.SugarLogger.Errorf("初始化乘客信息失败：%v", err)
 		return err
 	}
 
 	err = action.AfterNateGetQueueNum()
 	if err != nil {
-		seelog.Errorf("获取候补排队信息失败：%v", err)
+		utils.SugarLogger.Errorf("获取候补排队信息失败：%v", err)
 		return err
 	}
 
 	confirmRes, err := action.AfterNateConfirmHB(buyPassengers, searchParam, trainData)
 	if err != nil {
-		seelog.Errorf("提交订单失败：%v", err)
+		utils.SugarLogger.Errorf("提交订单失败：%v", err)
 		return err
 	}
 
-	seelog.Infof("候补成功，订单号：%s", confirmRes.Data.ReserveNo)
+	utils.SugarLogger.Infof("候补成功，订单号：%s", confirmRes.Data.ReserveNo)
 	return nil
 }
 
 func waitToOrder() {
 	if time.Now().Hour() >= 23 || time.Now().Hour() <= 4 {
-		seelog.Infof("时间在23 点 ～5点暂时不买票")
+		utils.SugarLogger.Infof("时间在23 点 ～5点暂时不买票")
 
 		for {
 			if 5 <= time.Now().Hour() && time.Now().Hour() < 23 {
@@ -536,8 +540,8 @@ func startCheckLogin() {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				seelog.Error(err)
-				seelog.Flush()
+				utils.SugarLogger.Error(err)
+				utils.SugarLogger.Sync()
 			}
 		}()
 
@@ -548,14 +552,14 @@ func startCheckLogin() {
 			select {
 			case <-timer.C:
 				if !action.CheckLogin() {
-					seelog.Errorf("登陆状态为未登陆")
+					utils.SugarLogger.Errorf("登陆状态为未登陆")
 				} else {
-					seelog.Info("登陆状态为登陆中")
+					utils.SugarLogger.Info("登陆状态为登陆中")
 				}
 			case <-alTimer.C:
 				err := action.GetLoginData()
 				if err != nil {
-					seelog.Errorf("自动登陆失败：%v", err)
+					utils.SugarLogger.Errorf("自动登陆失败：%v", err)
 				}
 			}
 		}
@@ -565,8 +569,9 @@ func startCheckLogin() {
 
 func Init() {
 	utils.ConfFile = *configPath
-	initLog()
 	initUtil()
+	utils.InitLogger()
+
 	initHttp()
 }
 
@@ -576,7 +581,7 @@ func initUtil() {
 	railExpStr := utils.GetCookieVal("RAIL_EXPIRATION")
 	railExp, _ := strconv.Atoi(railExpStr)
 	if railExp <= int(time.Now().Unix()*1000) || *mustDevice == "1" {
-		seelog.Info("开始重新获取设备信息")
+		utils.SugarLogger.Info("开始重新获取设备信息")
 		utils.GetDeviceInfo()
 	}
 
@@ -589,35 +594,36 @@ func initUtil() {
 	// utils.InitAvailableCDN()
 }
 
-func initLog() {
-	logType := `<console/>`
-	if *runType == "web" {
-		logType = `<file path="log/log.log"/>`
-	}
-
-	logger, err := seelog.LoggerFromConfigAsString(`<seelog type="sync" minlevel="info">
-    <outputs formatid="main">
-        ` + logType + `
-    </outputs>
-	<formats>
-        <format id="main" format="%Date %Time [%LEV] %RelFile:%Line - %Msg%n"></format>
-    </formats>
-</seelog>`)
-	if err != nil {
-		log.Panicln(err)
-	}
-	err = seelog.ReplaceLogger(logger)
-	if err != nil {
-		log.Panicln(err)
-	}
-}
+// func initLog() {
+//
+// 	logType := `<console/>`
+// 	if *runType == "web" {
+// 		logType = `<file path="log/log.log"/>`
+// 	}
+//
+// 	logger, err := utils.SugarLogger.LoggerFromConfigAsString(`<utils.SugarLogger type="sync" minlevel="info">
+//     <outputs formatid="main">
+//         ` + logType + `
+//     </outputs>
+// 	<formats>
+//         <format id="main" format="%Date %Time [%LEV] %RelFile:%Line - %Msg%n"></format>
+//     </formats>
+// </utils.SugarLogger>`)
+// 	if err != nil {
+// 		log.Panicln(err)
+// 	}
+// 	err = utils.SugarLogger.ReplaceLogger(logger)
+// 	if err != nil {
+// 		log.Panicln(err)
+// 	}
+// }
 
 func initHttp() {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				seelog.Error(err)
-				seelog.Flush()
+				utils.SugarLogger.Error(err)
+				_ = utils.SugarLogger.Sync()
 			}
 		}()
 
@@ -633,7 +639,7 @@ func initHttp() {
 		http.HandleFunc("/", http12306.LoginView)
 		http.HandleFunc("/send-msg", http12306.SendMsg)
 		if err := http.ListenAndServe(":28178", nil); err != nil {
-			log.Panicln(err)
+			utils.SugarLogger.Error(err)
 		}
 	}()
 }

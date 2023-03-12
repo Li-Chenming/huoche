@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"github.com/cihub/seelog"
 	"sync"
 	"sync/atomic"
 )
@@ -26,8 +25,8 @@ func InitAvailableCDN() {
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
-				seelog.Error(err)
-				seelog.Flush()
+				SugarLogger.Error(err)
+				SugarLogger.Sync()
 			}
 		}()
 
@@ -44,8 +43,8 @@ func InitAvailableCDN() {
 			go func(cdns []string) {
 				defer func() {
 					if err := recover(); err != nil {
-						seelog.Error(err)
-						seelog.Flush()
+						SugarLogger.Error(err)
+						SugarLogger.Sync()
 					}
 				}()
 
@@ -54,7 +53,7 @@ func InitAvailableCDN() {
 					err := RequestGetWithCDN(GetCookieStr(), "https://kyfw.12306.cn/otn/dynamicJs/omseuuq", nil, nil, cdn)
 					// err := RequestGetWithCDN(GetCookieStr(), "https://www.baidu.com", nil, nil, cdn)
 					if err != nil {
-						seelog.Tracef("cdn %s 请求失败", cdn)
+						SugarLogger.Infof("cdn %s 请求失败", cdn)
 						continue
 					}
 
@@ -68,8 +67,8 @@ func InitAvailableCDN() {
 		}
 
 		availableCDN.wg.Wait()
-		seelog.Infof("可用cdn数量为: %d", len(availableCDN.cdns))
-		seelog.Infof("可用cdn数量: %v", availableCDN.cdns)
+		SugarLogger.Infof("可用cdn数量为: %d", len(availableCDN.cdns))
+		SugarLogger.Infof("可用cdn数量: %v", availableCDN.cdns)
 
 	}()
 }

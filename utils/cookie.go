@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/chromedp/chromedp"
-	"github.com/cihub/seelog"
 	"github.com/yincongcyincong/go12306/module"
 	"net/url"
 	"regexp"
@@ -56,7 +55,7 @@ func GetDeviceInfo() {
 		deviceUrl := "https://kyfw.12306.cn/otn/HttpZF/logdevice?" + ReplaceChar(CreateLogDeviceParam().Encode())
 		body, err := RequestGetWithoutJson("", deviceUrl+"&timestamp="+strconv.Itoa(int(time.Now().Unix()*1000)), nil)
 		if err != nil {
-			seelog.Error(err)
+			SugarLogger.Error(err)
 			continue
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -66,7 +65,7 @@ func GetDeviceInfo() {
 			deviceInfo := new(module.DeviceInfo)
 			err = json.Unmarshal(body, deviceInfo)
 			if err != nil {
-				seelog.Error(err)
+				SugarLogger.Error(err)
 				continue
 			}
 			if deviceInfo.CookieCode == "" {
@@ -76,7 +75,7 @@ func GetDeviceInfo() {
 			// 有数据就是获取成功
 			cookie.cookie["RAIL_DEVICEID"] = deviceInfo.Dfp
 			cookie.cookie["RAIL_EXPIRATION"] = deviceInfo.Exp
-			seelog.Info("获取设备信息成功")
+			SugarLogger.Info("获取设备信息成功")
 			return
 		}
 	}
@@ -84,7 +83,7 @@ func GetDeviceInfo() {
 	// 杀手锏自动启动chrome获取
 	err := GetByChromdp()
 	if err != nil {
-		seelog.Error(err)
+		SugarLogger.Error(err)
 	}
 }
 
@@ -133,13 +132,13 @@ func CreateLogDeviceParam() url.Values {
 	UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0." + webNo + ".109 Safari/537.36"
 	body, err := RequestGetWithoutJson("", "https://kyfw.12306.cn/otn/HttpZF/GetJS", nil)
 	if err != nil {
-		seelog.Error(err)
+		SugarLogger.Error(err)
 		return nil
 	}
 
 	matchData := AlgIDRe.FindSubmatch(body)
 	if len(matchData) < 2 {
-		seelog.Error("获取 algID 失败")
+		SugarLogger.Error("获取 algID 失败")
 		return nil
 	}
 	algId := strings.TrimLeft(string(matchData[1]), `\x3d`)
@@ -226,7 +225,7 @@ func createHashCode(token, body string) string {
 		case encodePar, zaPar:
 			token = encodeToken(token)
 		default:
-			seelog.Error("匹配类型查找失败")
+			SugarLogger.Error("匹配类型查找失败")
 		}
 	}
 
@@ -327,7 +326,7 @@ func GetByChromdp() error {
 		chromedp.UserAgent(UserAgent))
 	allocCtx, _ := chromedp.NewExecAllocator(context.Background(), ops...)
 
-	ctx, _ := chromedp.NewContext(allocCtx, chromedp.WithLogf(seelog.Infof))
+	ctx, _ := chromedp.NewContext(allocCtx, chromedp.WithLogf(SugarLogger.Infof))
 
 	var chromCookieStr string
 	err := chromedp.Run(ctx, chromedp.Tasks{
