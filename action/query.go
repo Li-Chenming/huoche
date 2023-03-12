@@ -24,6 +24,11 @@ func GetTrainInfo(searchParam *module.SearchParam) ([]*module.TrainData, error) 
 
 	var err error
 	searchRes := new(module.TrainRes)
+
+	if utils.OpenCND==1{
+		return GetTrainInfoV2(searchParam)
+	}
+
 	targeturl := fmt.Sprintf("https://kyfw.12306.cn/otn/%s?leftTicketDTO.train_date=%s&leftTicketDTO.from_station=%s&leftTicketDTO.to_station=%s&purpose_codes=ADULT",
 		utils.QueryUrl, searchParam.TrainDate, searchParam.FromStation, searchParam.ToStation)
 	req, err := http.NewRequest("GET", targeturl, strings.NewReader(""))
@@ -47,6 +52,78 @@ func GetTrainInfo(searchParam *module.SearchParam) ([]*module.TrainData, error) 
 	if err != nil {
 		return nil, fmt.Errorf("%s ：%s", err.Error(), "json Unmarshal resp failed")
 	}
+
+	if searchRes.HTTPStatus != 200 && searchRes.Status {
+		return nil, errors.New(fmt.Sprintf("获取列车信息失败: %+v", searchRes))
+	}
+
+	searchDatas := make([]*module.TrainData, len(searchRes.Data.Result))
+	for i, res := range searchRes.Data.Result {
+		resSlice := strings.Split(res, "|")
+		sd := new(module.TrainData)
+		sd.Status = resSlice[1]
+		sd.TrainName = resSlice[2]
+		sd.TrainNo = resSlice[3]
+		sd.FromStationName = searchRes.Data.Map[resSlice[6]]
+		sd.ToStationName = searchRes.Data.Map[resSlice[7]]
+		sd.FromStation = resSlice[6]
+		sd.ToStation = resSlice[7]
+
+		if resSlice[1] == "预订" {
+			sd.SecretStr = resSlice[0]
+			sd.LeftTicket = resSlice[29]
+			sd.StartTime = resSlice[8]
+			sd.ArrivalTime = resSlice[9]
+			sd.DistanceTime = resSlice[10]
+			sd.IsCanNate = resSlice[37]
+
+			sd.SeatInfo = make(map[string]string)
+			sd.SeatInfo["特等座"] = resSlice[utils.SeatType["特等座"]]
+			sd.SeatInfo["商务座"] = resSlice[utils.SeatType["商务座"]]
+			sd.SeatInfo["一等座"] = resSlice[utils.SeatType["一等座"]]
+			sd.SeatInfo["二等座"] = resSlice[utils.SeatType["二等座"]]
+			sd.SeatInfo["软卧"] = resSlice[utils.SeatType["软卧"]]
+			sd.SeatInfo["硬卧"] = resSlice[utils.SeatType["硬卧"]]
+			sd.SeatInfo["硬座"] = resSlice[utils.SeatType["硬座"]]
+			sd.SeatInfo["无座"] = resSlice[utils.SeatType["无座"]]
+			sd.SeatInfo["动卧"] = resSlice[utils.SeatType["动卧"]]
+			sd.SeatInfo["软座"] = resSlice[utils.SeatType["软座"]]
+		}
+
+		searchDatas[i] = sd
+	}
+	return searchDatas, nil
+}
+
+func GetTrainInfoV2(searchParam *module.SearchParam) ([]*module.TrainData, error) {
+
+	var err error
+	searchRes := new(module.TrainRes)
+	targeturl := fmt.Sprintf("https://kyfw.12306.cn/otn/%s?leftTicketDTO.train_date=%s&leftTicketDTO.from_station=%s&leftTicketDTO.to_station=%s&purpose_codes=ADULT",
+		utils.QueryUrl, searchParam.TrainDate, searchParam.FromStation, searchParam.ToStation)
+
+	head := map[string]string{
+		"Cookie":           "RAIL_DEVICEID=1",
+		"Content-Type":     "application/x-www-form-urlencoded; charset=UTF-8",
+		"User-Agent":       utils.UserAgent,
+		"Host":             "kyfw.12306.cn",
+		"X-Requested-With": "XMLHttpRequest",
+		"Origin":           "https://kyfw.12306.cn",
+	}
+
+	cdn := utils.GetCdn()
+	if utils.InBlackList(cdn)||cdn==""{
+		utils.SugarLogger.Infof("URL= %s cdn in black list or nil %v ",cdn)
+		return nil, errors.New("在 黑名单中")
+	}
+	utils.SugarLogger.Infof("CND is %v ",cdn)
+
+	err = utils.RequestGetWithCDN(utils.GetCookieStr(), targeturl, searchRes, head, utils.GetCdn())
+	if err != nil {
+		return nil, err
+	}
+	 utils.AddBlackList(cdn)
+
 
 	if searchRes.HTTPStatus != 200 && searchRes.Status {
 		return nil, errors.New(fmt.Sprintf("获取列车信息失败: %+v", searchRes))
@@ -122,7 +199,7 @@ func GetRepeatSubmitToken() (*module.SubmitToken, error) {
 		}
 	}
 
-	if submitToken.TicketInfo==nil||submitToken.OrderRequestParam==nil{
+	if submitToken.TicketInfo == nil || submitToken.OrderRequestParam == nil {
 		return nil, errors.New("get submitToken.TicketInfo is err")
 	}
 	return submitToken, nil

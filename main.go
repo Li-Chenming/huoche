@@ -571,7 +571,8 @@ func Init() {
 	utils.ConfFile = *configPath
 	initUtil()
 	utils.InitLogger()
-
+	utils.InitBlacklist()
+	utils.InitAvailableCDN()
 	initHttp()
 }
 
@@ -590,8 +591,7 @@ func initUtil() {
 	}
 
 	utils.SaveConf()
-	utils.InitBlacklist()
-	// utils.InitAvailableCDN()
+
 }
 
 // func initLog() {

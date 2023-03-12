@@ -22,7 +22,6 @@ var availableCDN = &AvailableCDN{
 }
 
 func InitAvailableCDN() {
-	go func() {
 		defer func() {
 			if err := recover(); err != nil {
 				SugarLogger.Error(err)
@@ -70,10 +69,13 @@ func InitAvailableCDN() {
 		SugarLogger.Infof("可用cdn数量为: %d", len(availableCDN.cdns))
 		SugarLogger.Infof("可用cdn数量: %v", availableCDN.cdns)
 
-	}()
+
 }
 
 func GetCdn() string {
+	if len(availableCDN.cdns)==0{
+		return ""
+	}
 	cdn := availableCDN.cdns[int(availableCDN.idx)%len(availableCDN.cdns)]
 	atomic.AddInt64(&availableCDN.idx, 1)
 	return cdn
