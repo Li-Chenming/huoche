@@ -58,7 +58,7 @@ func GetDeviceInfo() {
 			SugarLogger.Error(err)
 			continue
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 		if bytes.Contains(body, []byte("callbackFunction")) {
 			body = bytes.TrimLeft(body, "callbackFunction('")
 			body = bytes.TrimRight(body, "')")

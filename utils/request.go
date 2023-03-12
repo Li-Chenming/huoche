@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/satori/go.uuid"
+
 	"github.com/yincongcyincong/go12306/module"
 )
 
@@ -61,12 +63,16 @@ func GetClientDo(req *http.Request) ([]byte,error) {
 		}
 	}
 
+	reqID:="UUID"
+	u1:= uuid.NewV4()
+	reqID=u1.String()
+
 	now:=time.Now()
-	SugarLogger.Debugf("send req url:%s,header:%v", req.URL,req.Header)
+	SugarLogger.Debugf("send req url:%s,reqID :%s ,header:%v", req.URL,reqID,req.Header)
 	resp, err := client.Do(req)
 
 	if err != nil || resp == nil {
-		SugarLogger.Errorf("url: %v, err: %v, resp: %s", req.RequestURI, err, resp)
+		SugarLogger.Errorf("url: %s,reqID :%s,err: %v ,resp: %s", req.URL, reqID,err, resp)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -74,7 +80,7 @@ func GetClientDo(req *http.Request) ([]byte,error) {
 	AddCookieStr(setCookies)
 
 	res, err := ioutil.ReadAll(resp.Body)
-	SugarLogger.Debugf("url: %v, resp: %s ,timeout :%s", req.RequestURI,string(res),time.Since(now))
+	SugarLogger.Debugf("url: %s ,reqID :%s ,resp: %s ,timeout :%s", req.URL,reqID,string(res),time.Since(now))
 
 	return res, err
 }

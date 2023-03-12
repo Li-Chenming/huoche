@@ -25,7 +25,7 @@ func GetTrainInfo(searchParam *module.SearchParam) ([]*module.TrainData, error) 
 	var err error
 	searchRes := new(module.TrainRes)
 
-	if utils.OpenCND==1{
+	if utils.OpenCND == 1 {
 		return GetTrainInfoV2(searchParam)
 	}
 
@@ -112,18 +112,17 @@ func GetTrainInfoV2(searchParam *module.SearchParam) ([]*module.TrainData, error
 	}
 
 	cdn := utils.GetCdn()
-	if utils.InBlackList(cdn)||cdn==""{
-		utils.SugarLogger.Infof("URL= %s cdn in black list or nil %v ",cdn)
+	if utils.InBlackList(cdn) || cdn == "" {
+		utils.SugarLogger.Infof("URL= %s cdn in black list or nil %v ", cdn)
 		return nil, errors.New("在 黑名单中")
 	}
-	utils.SugarLogger.Infof("CND is %v ",cdn)
+	utils.SugarLogger.Infof("CND is %v ", cdn)
 
 	err = utils.RequestGetWithCDN(utils.GetCookieStr(), targeturl, searchRes, head, utils.GetCdn())
 	if err != nil {
 		return nil, err
 	}
-	 utils.AddBlackList(cdn)
-
+	utils.AddBlackList(cdn)
 
 	if searchRes.HTTPStatus != 200 && searchRes.Status {
 		return nil, errors.New(fmt.Sprintf("获取列车信息失败: %+v", searchRes))
@@ -170,7 +169,10 @@ func GetTrainInfoV2(searchParam *module.SearchParam) ([]*module.TrainData, error
 func GetRepeatSubmitToken() (*module.SubmitToken, error) {
 
 	body, err := utils.RequestGetWithoutJson(utils.GetCookieStr(), "https://kyfw.12306.cn/otn/confirmPassenger/initDc", nil)
-
+	if err != nil {
+		utils.SugarLogger.Errorf("获取提交数据GetRepeatSubmitToken：%v", err)
+		return nil, err
+	}
 	matchRes := TokenRe.FindStringSubmatch(string(body))
 	submitToken := new(module.SubmitToken)
 	if len(matchRes) > 1 {
@@ -179,13 +181,15 @@ func GetRepeatSubmitToken() (*module.SubmitToken, error) {
 
 	ticketRes := TicketInfoRe.FindSubmatch(body)
 	if len(ticketRes) > 1 {
-		utils.SugarLogger.Info(string(ticketRes[1]))
+		utils.SugarLogger.Debug(string(ticketRes[1]))
 
 		ticketRes[1] = bytes.Replace(ticketRes[1], []byte("'"), []byte(`"`), -1)
-		utils.SugarLogger.Info(string(ticketRes[1]))
+		utils.SugarLogger.Debug(string(ticketRes[1]))
 
 		err = json.Unmarshal(ticketRes[1], &submitToken.TicketInfo)
 		if err != nil {
+			utils.SugarLogger.Errorf("获取提交数据GetRepeatSubmitToken json：%v", err)
+
 			return nil, err
 		}
 	}
@@ -195,12 +199,14 @@ func GetRepeatSubmitToken() (*module.SubmitToken, error) {
 		orderRes[1] = bytes.Replace(orderRes[1], []byte("'"), []byte(`"`), -1)
 		err = json.Unmarshal(orderRes[1], &submitToken.OrderRequestParam)
 		if err != nil {
+			utils.SugarLogger.Errorf("获取提交数据GetRepeatSubmitToken json：%v", err)
+
 			return nil, err
 		}
 	}
 
 	if submitToken.TicketInfo == nil || submitToken.OrderRequestParam == nil {
-		return nil, errors.New("get submitToken.TicketInfo is err")
+		return nil, errors.New("get submitToken OrderRequestParam or TicketInfo is err")
 	}
 	return submitToken, nil
 }

@@ -29,6 +29,9 @@ func InitAvailableCDN() {
 			}
 		}()
 
+		if OpenCND==0{
+			return
+		}
 		num := (len(CDNs) / availableCDN.currency) + 1
 		for i := 0; i < num; i++ {
 			availableCDN.wg.Add(1)

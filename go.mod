@@ -7,6 +7,7 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20220217222649-d8c14a5c6edf
 	github.com/chromedp/chromedp v0.7.8
 	github.com/natefinch/lumberjack v2.0.0+incompatible
+	github.com/satori/go.uuid v1.2.0
 	github.com/smartystreets/goconvey v1.7.2 // indirect
 	github.com/unknwon/goconfig v1.0.0
 	go.uber.org/zap v1.24.0

@@ -23,13 +23,11 @@ import (
 )
 
 var (
-	runType   = flag.String("run_type", "command", "web：网页模式")
-	wxrobot   = flag.String("wxrobot", "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=c55090ed-f991-46c8-94b7-616cf826ffc9", "企业微信机器人通知")
+	runType    = flag.String("run_type", "command", "web：网页模式")
+	wxrobot    = flag.String("wxrobot", "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=c55090ed-f991-46c8-94b7-616cf826ffc9", "企业微信机器人通知")
 	mustDevice = flag.String("must_device", "0", "强制生成设备信息")
-	configPath =flag.String("c", "./conf/conf.ini", "配置文件路径")
-
+	configPath = flag.String("c", "./conf/conf.ini", "配置文件路径")
 )
-
 
 func main() {
 
@@ -47,7 +45,6 @@ func main() {
 		// action.LoginOut()
 	}
 }
-
 
 var trainCache *module.TrainData
 
@@ -144,7 +141,7 @@ func CommandStart() {
 		utils.SugarLogger.Errorf("查询车站失败:%v", err)
 		return
 	}
-	delay:=time.Since(now).Milliseconds()
+	delay := time.Since(now).Milliseconds()
 	for _, t := range trains {
 		utils.SugarLogger.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s,",
 			t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"])
@@ -153,7 +150,7 @@ func CommandStart() {
 	// 获取定时抢票配置
 	startRunTimeStr, err := ConfigFile.GetValue("cron", "startRunTime")
 	OffsetMs, err := ConfigFile.Int("cron", "OffsetMs")
-	OffsetMs-=int(delay)
+	OffsetMs -= int(delay)
 	if err != nil {
 		OffsetMs = 0
 	}
@@ -175,7 +172,7 @@ func CommandStart() {
 		goStartOffsetMs = 0
 	}
 
-	var goNum int =1
+	var goNum int = 1
 	goNum, _ = ConfigFile.Int("cron", "goNum")
 
 	// 开启抢票
@@ -191,11 +188,11 @@ func CommandStart() {
 					if err := recover(); err != nil {
 						utils.SugarLogger.Error(err)
 						utils.SugarLogger.Sync()
-						if trainCache==nil{
+						if trainCache == nil {
 							return
 						}
 						utils.SugarLogger.Info("开始购买兜底", trainCache.TrainNo)
-						err2:=startOrder(searchParam, trainCache, passengerMap)
+						err2 := startOrder(searchParam, trainCache, passengerMap)
 						// 购买成功加入小黑屋
 						if err2 != nil {
 							utils.AddBlackList(trainCache.TrainNo)
@@ -204,7 +201,7 @@ func CommandStart() {
 
 						// 暂时用不上
 						if *wxrobot != "" {
-							utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功,  %s 请登陆12306查看，付款", trainCache.TrainNo,passengerStr))
+							utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功,  %s 请登陆12306查看，付款", trainCache.TrainNo, passengerStr))
 						}
 						// goto Reorder
 					}
@@ -216,7 +213,7 @@ func CommandStart() {
 				for i := 0; i < 2; i++ {
 					utils.SugarLogger.Infof("第%d线程第%d次循环\n", threadID, i)
 					t, isAfterNate, err = getTrainInfo(ctx, searchParam, trainMap, seatSlice, isNate)
-					utils.SugarLogger.Infof("刷到票时间%v\n",time.Now())
+					utils.SugarLogger.Infof("刷到票时间%v\n", time.Now())
 					if t != nil {
 						utils.SugarLogger.Infof("车次: %s, 状态: %s, 始发车站: %s, 终点站:%s,  %s: %s, 历时：%s, 二等座: %s, 一等座: %s, 商务座: %s, 软卧: %s, 硬卧: %s，软座: %s，硬座: %s， 无座: %s, \n sss:%s",
 							t.TrainNo, t.Status, t.FromStationName, t.ToStationName, t.StartTime, t.ArrivalTime, t.DistanceTime, t.SeatInfo["二等座"], t.SeatInfo["一等座"], t.SeatInfo["商务座"], t.SeatInfo["软卧"], t.SeatInfo["硬卧"], t.SeatInfo["软座"], t.SeatInfo["硬座"], t.SeatInfo["无座"], t.SecretStr)
@@ -235,7 +232,7 @@ func CommandStart() {
 					}
 				}
 
-				if t==nil{
+				if t == nil {
 					return
 				}
 
@@ -255,7 +252,7 @@ func CommandStart() {
 
 				// 暂时用不上
 				if *wxrobot != "" {
-					utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功,  %s 请登陆12306查看，付款", t.TrainNo,passengerStr))
+					utils.SendWxrootMessage(*wxrobot, fmt.Sprintf("车次：%s 购买成功,  %s 请登陆12306查看，付款", t.TrainNo, passengerStr))
 				}
 				// goto Reorder
 
@@ -336,7 +333,8 @@ func getTrainInfo(ctx context.Context, searchParam *module.SearchParam, trainMap
 	return trainData, false, nil
 }
 
-var sumbitCount int =2
+var sumbitCount int = 2
+
 func startOrder(searchParam *module.SearchParam, trainData *module.TrainData, passengerMap map[string]bool) error {
 	// err := action.GetLoginData()
 	// if err != nil {
@@ -355,36 +353,47 @@ SubmitOrder:
 	err := action.SubmitOrder(trainData, searchParam)
 	if err != nil {
 		utils.SugarLogger.Errorf("提交订单失败：%v", err)
-		if c<sumbitCount{
+		if c < sumbitCount {
 			c++
 			goto SubmitOrder
 		}
 		return err
 	}
-	GetRepeatSubmitToken:
+
+	utils.SugarLogger.Info("SubmitOrder ok %s")
+
+GetRepeatSubmitToken:
 	submitToken, err := action.GetRepeatSubmitToken()
-	marshal, _ := json.Marshal(submitToken.TicketInfo)
-	utils.SugarLogger.Infof("submitToken=\n %s",string(marshal))
+	if err == nil {
+		marshal, err2 := json.Marshal(submitToken.TicketInfo)
+		if err2 != nil {
+			utils.SugarLogger.Infof("submitToken: %s", string(marshal))
+		}
+	}
+
 	if err != nil {
-		if c<sumbitCount{
+		if c < sumbitCount {
 			c++
 			goto GetRepeatSubmitToken
 		}
 		utils.SugarLogger.Errorf("获取提交数据失败：%v", err)
 		return err
 	}
+	utils.SugarLogger.Info("GetRepeatSubmitToken ok %s")
 
-	GetPassengers:
+GetPassengers:
 	passengers, err := action.GetPassengers(submitToken)
 
 	if err != nil {
 		utils.SugarLogger.Errorf("获取乘客失败：%v", err)
-		if c<sumbitCount{
+		if c < sumbitCount {
 			c++
 			goto GetPassengers
 		}
 		return err
 	}
+	utils.SugarLogger.Info("GetPassengers ok %s")
+
 	// go
 	buyPassengers := make([]*module.Passenger, 0)
 	for _, p := range passengers.Data.NormalPassengers {
@@ -392,35 +401,38 @@ SubmitOrder:
 			buyPassengers = append(buyPassengers, p)
 		}
 	}
-	utils.SugarLogger.Infof("buyPassengers=%v",buyPassengers)
+	utils.SugarLogger.Infof("buyPassengers=%v", buyPassengers)
 
-	CheckOrder:
+CheckOrder:
 	err = action.CheckOrder(buyPassengers, submitToken, searchParam)
 	if err != nil {
 		utils.SugarLogger.Errorf("检查订单失败：%v", err)
-		if c<sumbitCount{
+		if c < sumbitCount {
 			c++
 			goto CheckOrder
 		}
 		return err
 	}
+	utils.SugarLogger.Info("CheckOrder ok %s")
 
 	// err = action.GetQueueCount(submitToken, searchParam)
 	// if err != nil {
 	// 	utils.SugarLogger.Errorf("获取排队数失败：%v", err)
 	// 	return err
 	// }
-	ConfirmQueue:
+ConfirmQueue:
 	err = action.ConfirmQueue(buyPassengers, submitToken, searchParam)
 	if err != nil {
 		utils.SugarLogger.Errorf("提交订单失败：%v", err)
-		if c<sumbitCount{
+		if c < sumbitCount {
 			c++
 			goto ConfirmQueue
 		}
 		return err
 	}
-	utils.SugarLogger.Infof("提交订单时间%v\n",time.Now())
+	utils.SugarLogger.Info("ConfirmQueue ok %s")
+
+	utils.SugarLogger.Infof("提交订单时间%v\n", time.Now())
 
 	var orderWaitRes *module.OrderWaitRes
 	for i := 0; i < 20; i++ {
@@ -566,11 +578,10 @@ func startCheckLogin() {
 	}()
 }
 
-
 func Init() {
+	utils.InitLogger()
 	utils.ConfFile = *configPath
 	initUtil()
-	utils.InitLogger()
 	utils.InitBlacklist()
 	utils.InitAvailableCDN()
 	initHttp()
